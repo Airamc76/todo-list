@@ -4215,17 +4215,12 @@ function showJoinGroupModal() {
         const errEl = $('#m-join-err');
         btn.disabled = true; btn.textContent = 'Buscando…';
         try {
-          // RPC: corre con SECURITY DEFINER — permite unirse sin ser miembro previo
-          const res = await fetch(`${SUPA_URL}/rest/v1/rpc/join_group_by_code`, {
-            method: 'POST',
-            headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${_accessToken || SUPA_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_code: code })
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || `Error ${res.status}`);
-          }
-          const g = await res.json();
+          const rows = await groupFetch('GET', `invite_code=eq.${code}`);
+          if (!Array.isArray(rows) || rows.length === 0) throw new Error('Código inválido — grupo no encontrado');
+          const g = rows[0];
+          if ((g.members||[]).some(m => m.user_id === currentUser.id)) throw new Error('Ya sos miembro de este grupo');
+          const me = { user_id: currentUser.id, name: state.user?.name || '', email: _authUser?.email || '', joined_at: new Date().toISOString() };
+          await groupFetch('PATCH', `id=eq.${g.id}`, { members: [...(g.members||[]), me], updated_at: new Date().toISOString() });
           closeModal();
           await fetchGroupsFromCloud();
           if (g?.id) { state.activeGroupId = g.id; renderGroups(); }
