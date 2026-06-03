@@ -3070,8 +3070,10 @@ function scheduleSync() {
         data:       state,
         updated_at: new Date().toISOString()
       });
+      _syncTimer = null;
       setSyncStatus('', 'Guardado ✓');
     } catch(e) {
+      _syncTimer = null;
       setSyncStatus('error', 'Error: ' + e.message);
       console.error('Push error:', e);
     }
@@ -3082,6 +3084,7 @@ function scheduleSync() {
 async function pullFromCloud(user) {
   const uid = (user || currentUser)?.id;
   if (!uid) return false;
+  if (_syncTimer) return false;   // hay push pendiente → saltarse el pull para no pisar cambios locales
   setSyncStatus('syncing', 'Sincronizando…');
   try {
     const rows = await dbFetch('GET', uid);
@@ -3091,9 +3094,9 @@ async function pullFromCloud(user) {
       setSyncStatus('', 'Nube vacía — subiendo datos locales…');
       return true;
     }
-    // Merge seguro: no pierde tareas locales no subidas aún
-    const merged = safeMerge(state, row.data);
-    state = merged;
+    // La nube manda — las eliminaciones se propagan correctamente.
+    // El guard _syncTimer garantiza que no hay cambios locales pendientes al llegar aquí.
+    state = { ...defaultState(), ...row.data };
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
     try { renderAll(); }     catch(re) { console.error('renderAll:', re); }
     try { applyTheme(); }    catch {}
