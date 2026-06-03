@@ -2431,6 +2431,10 @@
       <h2 class="auth-title" id="auth-title">Bienvenido</h2>
       <p class="auth-sub" id="auth-sub">Inicia sesión para sincronizar tus tareas.</p>
 
+      <div class="auth-field" id="auth-name-field" style="display:none;">
+        <label class="auth-label" for="auth-name">Tu nombre</label>
+        <input class="auth-input" id="auth-name" type="text" placeholder="Airam" maxlength="32" autocomplete="name" />
+      </div>
       <div class="auth-field">
         <label class="auth-label" for="auth-email">Email</label>
         <input class="auth-input" id="auth-email" type="email" placeholder="tu@email.com" autocomplete="email" />
@@ -3089,10 +3093,12 @@ setInterval(() => { if (currentUser) pullFromCloud(); }, 30000);
 function showApp(user) {
   document.getElementById('auth-screen').classList.add('hidden');
   const email = user?.email || _authUser?.email || '';
-  document.getElementById('user-avatar').textContent = email.slice(0,2).toUpperCase() || 'A';
+  const name = user?.user_metadata?.name || _authUser?.user_metadata?.name || email.split('@')[0] || 'A';
+  document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
   document.getElementById('logout-email').textContent = email;
   const te = document.getElementById('topbar-user-email');
   if (te) te.textContent = email;
+  setTimeout(renderUser, 0);
 }
 function showAuth() {
   document.getElementById('auth-screen').classList.remove('hidden');
@@ -3111,6 +3117,7 @@ function showAuth() {
 
   function setMode(m) {
     mode = m;
+    const nameField = document.getElementById('auth-name-field');
     if (m === 'login') {
       title.textContent  = 'Bienvenido';
       sub.textContent    = 'Inicia sesión para sincronizar tus tareas.';
@@ -3118,6 +3125,7 @@ function showAuth() {
       swText.textContent = '¿No tienes cuenta?';
       swBtn.textContent  = 'Regístrate';
       document.getElementById('auth-pass').autocomplete = 'current-password';
+      if (nameField) nameField.style.display = 'none';
     } else {
       title.textContent  = 'Crear cuenta';
       sub.textContent    = 'Regístrate para sincronizar en todos tus dispositivos.';
@@ -3125,6 +3133,7 @@ function showAuth() {
       swText.textContent = '¿Ya tienes cuenta?';
       swBtn.textContent  = 'Inicia sesión';
       document.getElementById('auth-pass').autocomplete = 'new-password';
+      if (nameField) nameField.style.display = 'block';
     }
     errEl.classList.remove('show');
   }
@@ -3145,7 +3154,8 @@ function showAuth() {
       if (mode === 'login') {
         result = await supa.auth.signInWithPassword({ email, password: pass });
       } else {
-        result = await supa.auth.signUp({ email, password: pass });
+        const name = (document.getElementById('auth-name')?.value || '').trim();
+        result = await supa.auth.signUp({ email, password: pass, options: { data: { name: name || email.split('@')[0] } } });
         if (!result.error && result.data?.user && !result.data.session) {
           showErr('Revisa tu email para confirmar la cuenta.'); submit.disabled = false; submit.textContent = 'Crear cuenta'; return;
         }
@@ -3370,19 +3380,31 @@ applyTheme();
 applySettings();
 
 /* ----- User chip ----- */
+function getDisplayName() {
+  // Prioridad: metadata de Supabase (por usuario, no compartido en localStorage)
+  return _authUser?.user_metadata?.name || _authUser?.email?.split('@')[0] || state.user.name || 'Tú';
+}
 function renderUser() {
-  $('#user-name').textContent = state.user.name || 'Tú';
-  $('#user-avatar').textContent = (state.user.name || 'T').trim().charAt(0).toUpperCase();
+  const name = getDisplayName();
+  $('#user-name').textContent = name;
+  $('#user-avatar').textContent = name.trim().charAt(0).toUpperCase();
 }
 $('#user-chip').addEventListener('click', () => {
   openModal({
     title: 'Tu nombre',
-    body: `<input class="input" id="m-name" value="${escapeHtml(state.user.name)}" maxlength="32" />`,
+    body: `<input class="input" id="m-name" value="${escapeHtml(getDisplayName())}" maxlength="32" />`,
     actions: [
       { label: 'Cancelar', class: 'btn', onClick: closeModal },
-      { label: 'Guardar', class: 'btn btn-primary', onClick: () => {
+      { label: 'Guardar', class: 'btn btn-primary', onClick: async () => {
         const v = $('#m-name').value.trim();
-        if (v) { state.user.name = v; save(); renderUser(); }
+        if (v) {
+          // Guardar en Supabase metadata (por usuario, no en localStorage compartido)
+          if (supa && currentUser) {
+            await supa.auth.updateUser({ data: { name: v } });
+            if (_authUser) _authUser = { ..._authUser, user_metadata: { ...(_authUser.user_metadata || {}), name: v } };
+          }
+          state.user.name = v; save(); renderUser();
+        }
         closeModal();
       }}
     ]
