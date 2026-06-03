@@ -2991,7 +2991,9 @@ async function dbFetch(method, uid, body, _retry = false) {
   const token = _accessToken || SUPA_KEY;
   const base  = DATA_URL();
   const url   = method === 'GET'
-    ? `${base}?user_id=eq.${uid}&select=data&limit=1`
+    ? `${base}?user_id=eq.${uid}&select=data&order=updated_at.desc&limit=1`
+    : method === 'PATCH'
+    ? `${base}?user_id=eq.${uid}`
     : base;
   const ctrl  = new AbortController();
   const tid   = setTimeout(() => ctrl.abort(), 10000);
@@ -3003,7 +3005,7 @@ async function dbFetch(method, uid, body, _retry = false) {
         'apikey':        SUPA_KEY,
         'Authorization': `Bearer ${token}`,
         ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
-        ...(method === 'POST' ? { 'Prefer': 'resolution=merge-duplicates' } : {})
+        ...(method === 'PATCH' ? { 'Prefer': 'return=representation' } : {})
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: ctrl.signal
@@ -3027,7 +3029,8 @@ async function dbFetch(method, uid, body, _retry = false) {
   }
 
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  return method === 'GET' ? resp.json() : true;
+  if (method === 'GET' || method === 'PATCH') return resp.json();
+  return true;
 }
 
 // ── Merge seguro: nunca pierde datos locales ──────────────────
@@ -3058,18 +3061,20 @@ function safeMerge(local, cloud) {
   };
 }
 
-// ── Push a Supabase (debounce 2s) ──────────────────────────────
+// ── Push a Supabase (debounce 2s) ─────────────────────────────
+// Usa PATCH (update) para evitar filas duplicadas. Si no existe fila, hace POST (insert).
 function scheduleSync() {
   if (!currentUser) return;
   setSyncStatus('syncing', 'Guardando…');
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
     try {
-      const { error } = await supa.from('app_data').upsert(
-        { user_id: currentUser.id, data: state, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      );
-      if (error) throw error;
+      const payload = { data: state, updated_at: new Date().toISOString() };
+      const patched = await dbFetch('PATCH', currentUser.id, payload);
+      if (!Array.isArray(patched) || patched.length === 0) {
+        // Primera vez — no existe fila aún → INSERT
+        await dbFetch('POST', null, { user_id: currentUser.id, ...payload });
+      }
       _syncTimer = null;
       setSyncStatus('', 'Guardado ✓');
     } catch(e) {
@@ -3081,25 +3086,20 @@ function scheduleSync() {
 }
 
 // ── Pull de Supabase y aplicar al estado ───────────────────────
-async function pullFromCloud(user) {
+// force=true omite el guard de _syncTimer (usado en login y sync manual).
+async function pullFromCloud(user, force = false) {
   const uid = (user || currentUser)?.id;
   if (!uid) return false;
-  if (_syncTimer) return false;   // push pendiente → esperar para no pisar cambios locales
+  if (!force && _syncTimer) return false;  // push pendiente → esperar
   setSyncStatus('syncing', 'Sincronizando…');
   try {
-    const { data: rows, error } = await supa.from('app_data')
-      .select('data')
-      .eq('user_id', uid)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    const row = rows?.[0];
+    const rows = await dbFetch('GET', uid);
+    const row  = Array.isArray(rows) ? rows[0] : null;
     if (!row?.data) {
       setSyncStatus('', 'Nube vacía — subiendo datos locales…');
       return true;
     }
-    // La nube manda — las eliminaciones se propagan correctamente.
-    // El guard _syncTimer garantiza que no hay cambios locales pendientes al llegar aquí.
+    // La nube manda — eliminaciones y cambios de cualquier dispositivo llegan aquí.
     state = { ...defaultState(), ...row.data };
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
     try { renderAll(); }     catch(re) { console.error('renderAll:', re); }
@@ -3233,7 +3233,7 @@ document.addEventListener('click', async (e) => {
   if (e.target.closest('#settings-sync-btn') || e.target.closest('#topbar-sync-btn')) {
     const btn = e.target.closest('#settings-sync-btn, #topbar-sync-btn');
     if (btn) btn.style.opacity = '0.4';
-    await pullFromCloud();
+    await pullFromCloud(null, true);  // force=true: sync manual siempre ejecuta
     if (btn) btn.style.opacity = '1';
     return;
   }
@@ -3251,8 +3251,8 @@ if (supa) {
     if (session?.user) {
       _authUser = session.user;
       showApp(session.user);
-      clearTimeout(_syncTimer); _syncTimer = null;  // garantiza que el pull inicial no sea bloqueado
-      await pullFromCloud(session.user);  // pull primero, sin currentUser
+      clearTimeout(_syncTimer); _syncTimer = null;
+      await pullFromCloud(session.user, true);  // force=true: pull inicial siempre ejecuta
       currentUser = session.user;         // push habilitado
     } else {
       _authUser    = null;
