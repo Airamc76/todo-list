@@ -2945,9 +2945,7 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let supa = null;
 try { supa = supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e) { console.warn('Supabase no disponible:', e); }
 
-// Para DATA usamos fetch directo:
-// - En Electron: URL directa a Supabase
-// - En web/iOS: proxy Netlify en mismo dominio (sin CORS, sin bloqueos Safari)
+// Para DATA usamos fetch directo a Supabase en ambos casos:
 const isElectron = () => !!window.electronAPI;
 const DATA_URL   = () => isElectron()
   ? `${SUPA_URL}/rest/v1/app_data`
@@ -3109,10 +3107,13 @@ async function pullFromCloud(user) {
   }
 }
 
-// ── Al volver a la pestaña: pull silencioso ────────────────────
+// ── Al volver a la pestaña/ventana: pull silencioso ───────────
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && currentUser) pullFromCloud();
 });
+
+// ── Pull periódico (30 s) — mantiene web y Electron sincronizados ──
+setInterval(() => { if (currentUser) pullFromCloud(); }, 30000);
 
 // ── Show / hide auth screen ────────────────────────────────────
 function showApp(user) {
