@@ -2715,7 +2715,10 @@
           </div>
           <h3>Crea tu primer grupo</h3>
           <p>Comparte tareas con familia, amigos o equipo.</p>
-          <button class="btn btn-primary" id="group-create-first" style="margin-top: var(--s-3);">+ Nuevo grupo</button>
+          <div style="display:flex;gap:var(--s-2);justify-content:center;margin-top:var(--s-3);">
+            <button class="btn btn-primary" id="group-create-first">+ Nuevo grupo</button>
+            <button class="btn" id="group-join-first">🔗 Unirse con código</button>
+          </div>
         </div>
       </section>
 
@@ -3027,7 +3030,8 @@ function scheduleSync() {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
     try {
-      const payload = { data: state, updated_at: new Date().toISOString() };
+      const { groups: _g, ...stateForSync } = state;  // grupos se sincronizan por separado
+      const payload = { data: stateForSync, updated_at: new Date().toISOString() };
       const patched = await dbFetch('PATCH', currentUser.id, payload);
       if (!Array.isArray(patched) || patched.length === 0) {
         // Primera vez — no existe fila aún → INSERT
@@ -3064,6 +3068,7 @@ async function pullFromCloud(user, force = false) {
     try { applyTheme(); }    catch {}
     try { applySettings(); } catch {}
     setSyncStatus('', `Sincronizado ✓ · ${state.pendientes?.length ?? 0} pend.`);
+    fetchGroupsFromCloud();   // grupos en tabla separada
     return true;
   } catch(e) {
     setSyncStatus('error', e.message);
@@ -3337,7 +3342,7 @@ function setView(view) {
   // refresh view-specific content (pulls live counts from all sections)
   if (view === 'resumen') renderResumen();
   if (view === 'fecha') renderCalendar();
-  if (view === 'grupos') renderGroups();
+  if (view === 'grupos') { renderGroups(); fetchGroupsFromCloud(); }
   if (view === 'widgets') renderWidgets();
   if (view === 'ajustes') renderAjustes();
 }
@@ -4088,53 +4093,148 @@ function ensureActiveGroup() {
   }
 }
 
+/* =========================================================
+   GRUPOS — Colaboración real vía tabla Supabase separada
+   ========================================================= */
+const GROUPS_BASE = () => `${SUPA_URL}/rest/v1/groups`;
+
+async function groupFetch(method, params, body, _retry = false) {
+  const token = _accessToken || SUPA_KEY;
+  const url = GROUPS_BASE() + (params ? `?${params}` : '');
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 10000);
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method,
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${token}`,
+        ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
+        'Prefer': 'return=representation'
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+  } catch(e) {
+    clearTimeout(tid);
+    throw e.name === 'AbortError' ? new Error('Sin conexión (10s)') : e;
+  }
+  if (resp.status === 401 && !_retry && supa) {
+    try {
+      const { data: { session } } = await supa.auth.refreshSession();
+      if (session?.access_token) { _accessToken = session.access_token; return groupFetch(method, params, body, true); }
+    } catch {}
+    throw new Error('Sesión expirada');
+  }
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => '');
+    throw new Error(`Error ${resp.status}${t ? ': ' + t.slice(0,120) : ''}`);
+  }
+  const txt = await resp.text();
+  return txt ? JSON.parse(txt) : [];
+}
+
+function genInviteCode(name) {
+  const p = (name || 'GRP').replace(/[^a-zA-Z0-9]/g, '').slice(0,4).toUpperCase() || 'GRP';
+  return `${p}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+}
+
+function memberLabel(m) {
+  return {
+    initials: (m.name || m.email || '?').charAt(0).toUpperCase(),
+    label: m.name || m.email || 'Miembro',
+    isMe: m.user_id === currentUser?.id
+  };
+}
+
+async function fetchGroupsFromCloud() {
+  if (!currentUser) return;
+  try {
+    const uid = currentUser.id;
+    const rows = await groupFetch('GET',
+      `or=(created_by.eq.${uid},members.cs.[{"user_id":"${uid}"}])&order=updated_at.desc`
+    );
+    if (Array.isArray(rows)) {
+      state.groups = rows;
+      if (state.view === 'grupos') renderGroups();
+      updateBadges();
+    }
+  } catch(e) { console.error('fetchGroups:', e); }
+}
+
+async function pushGroupTasks(groupId, tasks) {
+  if (!currentUser) return;
+  try { await groupFetch('PATCH', `id=eq.${groupId}`, { tasks, updated_at: new Date().toISOString() }); }
+  catch(e) { console.error('pushGroupTasks:', e); }
+}
+
 function createGroup() {
   openModal({
     title: 'Nuevo grupo',
-    body: `<input class="input" id="m-gname" placeholder="Nombre del grupo (ej. Familia)" maxlength="40" />`,
+    body: `<input class="input" id="m-gname" placeholder="Nombre del grupo (ej. Familia)" maxlength="40" />
+           <p id="m-grp-err" style="color:var(--red);font-size:12px;margin:8px 0 0;display:none;"></p>`,
     actions: [
       { label: 'Cancelar', class: 'btn', onClick: closeModal },
-      { label: 'Crear', class: 'btn btn-primary', onClick: () => {
-        const v = $('#m-gname').value.trim();
+      { label: 'Crear', class: 'btn btn-primary', onClick: async () => {
+        const v = $('#m-gname')?.value.trim();
         if (!v) return;
-        const meName = state.user.name || 'Tú';
-        const g = {
-          id: uid(),
-          name: v,
-          invite: 'tareas.app/inv/' + Math.random().toString(36).slice(2, 10),
-          members: [{ id: 'me', name: meName, initials: meName.charAt(0).toUpperCase(), online: true }],
-          tasks: []
-        };
-        state.groups.push(g);
-        state.activeGroupId = g.id;
-        save();
-        closeModal();
-        renderGroups();
-        updateBadges();
+        const btn = $('#modal-box').querySelector('.btn-primary');
+        const errEl = $('#m-grp-err');
+        btn.disabled = true; btn.textContent = 'Creando…';
+        try {
+          const me = { user_id: currentUser.id, name: state.user?.name || '', email: _authUser?.email || '', joined_at: new Date().toISOString() };
+          const rows = await groupFetch('POST', '', { name: v, invite_code: genInviteCode(v), created_by: currentUser.id, members: [me], tasks: [], updated_at: new Date().toISOString() });
+          const g = Array.isArray(rows) ? rows[0] : rows;
+          closeModal();
+          await fetchGroupsFromCloud();
+          if (g?.id) { state.activeGroupId = g.id; renderGroups(); }
+        } catch(e) {
+          if(errEl){ errEl.textContent = e.message; errEl.style.display='block'; }
+          btn.disabled = false; btn.textContent = 'Crear';
+        }
       }}
     ]
   });
-  setTimeout(() => $('#m-gname').focus(), 50);
+  setTimeout(() => $('#m-gname')?.focus(), 50);
 }
 
-function addMember(group) {
+function showJoinGroupModal() {
   openModal({
-    title: 'Añadir miembro',
-    body: `<input class="input" id="m-mname" placeholder="Nombre del miembro" maxlength="32" />`,
+    title: 'Unirse a un grupo',
+    body: `<p style="font-size:13px;color:var(--text-soft);margin:0 0 var(--s-3);">Pedile el código al creador y pegalo acá.</p>
+           <input class="input" id="m-jcode" placeholder="Ej: FARV-4X2K" maxlength="12" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700;font-size:15px;" autocomplete="off" />
+           <p id="m-join-err" style="color:var(--red);font-size:12px;margin:8px 0 0;display:none;"></p>`,
     actions: [
       { label: 'Cancelar', class: 'btn', onClick: closeModal },
-      { label: 'Añadir', class: 'btn btn-primary', onClick: () => {
-        const v = $('#m-mname').value.trim();
-        if (!v) return;
-        group.members.push({
-          id: uid(), name: v, initials: v.charAt(0).toUpperCase(),
-          online: Math.random() > 0.5
-        });
-        save(); closeModal(); renderGroups();
+      { label: 'Unirse', class: 'btn btn-primary', onClick: async () => {
+        const code = $('#m-jcode')?.value.trim().toUpperCase();
+        if (!code) return;
+        const btn = $('#modal-box').querySelector('.btn-primary');
+        const errEl = $('#m-join-err');
+        btn.disabled = true; btn.textContent = 'Buscando…';
+        try {
+          const rows = await groupFetch('GET', `invite_code=eq.${code}`);
+          if (!Array.isArray(rows) || rows.length === 0) throw new Error('Código inválido — grupo no encontrado');
+          const g = rows[0];
+          if ((g.members||[]).some(m => m.user_id === currentUser.id)) throw new Error('Ya sos miembro de este grupo');
+          const me = { user_id: currentUser.id, name: state.user?.name || '', email: _authUser?.email || '', joined_at: new Date().toISOString() };
+          await groupFetch('PATCH', `id=eq.${g.id}`, { members: [...(g.members||[]), me], updated_at: new Date().toISOString() });
+          closeModal();
+          await fetchGroupsFromCloud();
+          state.activeGroupId = g.id; renderGroups();
+        } catch(e) {
+          if(errEl){ errEl.textContent = e.message; errEl.style.display='block'; }
+          btn.disabled = false; btn.textContent = 'Unirse';
+        }
       }}
     ]
   });
-  setTimeout(() => $('#m-mname').focus(), 50);
+  setTimeout(() => {
+    const i = $('#m-jcode');
+    if(i) { i.focus(); i.addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); }); }
+  }, 50);
 }
 
 function renderGroups() {
@@ -4149,96 +4249,98 @@ function renderGroups() {
     btn.className = 'group-tab';
     btn.textContent = g.name;
     btn.setAttribute('aria-pressed', g.id === state.activeGroupId);
-    btn.addEventListener('click', () => { state.activeGroupId = g.id; save(); renderGroups(); });
+    btn.addEventListener('click', () => { state.activeGroupId = g.id; renderGroups(); });
     tabs.appendChild(btn);
   });
-  const addBtn = document.createElement('button');
-  addBtn.className = 'group-tab add-group';
-  addBtn.textContent = '+ Nuevo grupo';
-  addBtn.addEventListener('click', createGroup);
-  tabs.appendChild(addBtn);
+
+  const newBtn = document.createElement('button');
+  newBtn.className = 'group-tab add-group';
+  newBtn.textContent = '+ Nuevo';
+  newBtn.addEventListener('click', createGroup);
+  tabs.appendChild(newBtn);
+
+  const joinBtn = document.createElement('button');
+  joinBtn.className = 'group-tab';
+  joinBtn.style.cssText = 'color:var(--text-soft);font-size:12.5px;';
+  joinBtn.textContent = '🔗 Unirse';
+  joinBtn.addEventListener('click', showJoinGroupModal);
+  tabs.appendChild(joinBtn);
 
   if (state.groups.length === 0) return;
-
   const g = state.groups.find(x => x.id === state.activeGroupId);
   if (!g) return;
 
+  const isCreator = g.created_by === currentUser?.id;
   const wrap = $('#group-content');
 
-  // head
   const head = document.createElement('div');
   head.className = 'card';
   head.innerHTML = `
     <div class="group-head">
-      <h2 contenteditable="true" spellcheck="false" data-rename="${g.id}">${escapeHtml(g.name)}</h2>
+      <h2 contenteditable="${isCreator}" spellcheck="false" data-rename="${g.id}">${escapeHtml(g.name)}</h2>
       <div class="members" id="g-members"></div>
-      <div class="invite">
-        <span class="invite-url">${escapeHtml(g.invite)}</span>
-        <button class="btn btn-sm" id="copy-invite">Copiar</button>
+      <div class="invite" title="Compartí este código para que otros se unan">
+        <span class="invite-url" style="font-weight:700;letter-spacing:.08em;font-size:13px;">${escapeHtml(g.invite_code)}</span>
+        <button class="btn btn-sm" id="copy-invite">Copiar código</button>
       </div>
     </div>
-    <form class="quick-add" id="g-add" style="margin: 0;">
-      <input class="input input-main" id="g-task-input" placeholder="Nueva tarea para el grupo…" />
-      <select class="select" id="g-task-assignee" style="flex: 0 0 140px;"></select>
-      <button class="btn btn-primary">Añadir</button>
-    </form>
-  `;
+    <form class="quick-add" id="g-add" style="margin:0;">
+      <input class="input input-main" id="g-task-input" placeholder="Nueva tarea para el grupo…" autocomplete="off" />
+      <select class="select" id="g-task-assignee" style="flex:0 0 140px;"></select>
+      <button class="btn btn-primary" type="submit">Añadir</button>
+    </form>`;
   wrap.appendChild(head);
 
   // members
   const mwrap = head.querySelector('#g-members');
-  g.members.forEach(m => {
+  (g.members||[]).forEach(m => {
+    const d = memberLabel(m);
     const el = document.createElement('div');
-    el.className = 'member' + (m.online ? ' member-online' : '');
-    el.textContent = m.initials;
-    el.title = m.name + (m.online ? ' · en línea' : '');
+    el.className = 'member' + (d.isMe ? ' member-online' : '');
+    el.textContent = d.initials;
+    el.title = d.label + (d.isMe ? ' (tú)' : '');
     mwrap.appendChild(el);
   });
-  const addM = document.createElement('button');
-  addM.className = 'member member-add';
-  addM.textContent = '+';
-  addM.title = 'Añadir miembro';
-  addM.addEventListener('click', () => addMember(g));
-  mwrap.appendChild(addM);
 
-  // rename
-  head.querySelector(`[data-rename="${g.id}"]`).addEventListener('blur', e => {
-    const v = e.target.textContent.trim();
-    if (v) { g.name = v; save(); renderGroups(); updateBadges(); }
-  });
+  // rename (creator only)
+  if (isCreator) {
+    head.querySelector('[data-rename]').addEventListener('blur', async e => {
+      const v = e.target.textContent.trim();
+      if (v && v !== g.name) {
+        try { await groupFetch('PATCH', `id=eq.${g.id}`, { name: v, updated_at: new Date().toISOString() }); g.name = v; updateBadges(); }
+        catch(e2) { console.error(e2); }
+      }
+    });
+  }
 
-  // copy invite
+  // copy code
   head.querySelector('#copy-invite').addEventListener('click', async e => {
     try {
-      await navigator.clipboard.writeText(g.invite);
+      await navigator.clipboard.writeText(g.invite_code);
       e.target.textContent = '✓ Copiado';
-      setTimeout(() => { e.target.textContent = 'Copiar'; }, 1600);
-    } catch {
-      e.target.textContent = 'Error';
-    }
+      setTimeout(() => { e.target.textContent = 'Copiar código'; }, 1800);
+    } catch { e.target.textContent = 'Error'; }
   });
 
   // assignee select
   const sel = head.querySelector('#g-task-assignee');
-  g.members.forEach(m => {
+  (g.members||[]).forEach(m => {
     const opt = document.createElement('option');
-    opt.value = m.id; opt.textContent = m.name;
+    opt.value = m.user_id;
+    opt.textContent = memberLabel(m).label;
+    if (m.user_id === currentUser?.id) opt.selected = true;
     sel.appendChild(opt);
   });
 
-  head.querySelector('#g-add').addEventListener('submit', e => {
+  // add task
+  head.querySelector('#g-add').addEventListener('submit', async e => {
     e.preventDefault();
     const v = head.querySelector('#g-task-input').value.trim();
     if (!v) return;
-    g.tasks.unshift({
-      id: uid(),
-      title: v,
-      status: 'pending',
-      addedBy: 'me',
-      assignee: head.querySelector('#g-task-assignee').value
-    });
-    save();
+    g.tasks = [{ id: uid(), title: v, status: 'pending', addedBy: currentUser?.id, assignee: sel.value }, ...(g.tasks||[])];
+    head.querySelector('#g-task-input').value = '';
     renderGroups(); updateBadges();
+    await pushGroupTasks(g.id, g.tasks);
   });
 
   // kanban
@@ -4246,41 +4348,38 @@ function renderGroups() {
   kanban.className = 'kanban';
   kanban.style.marginTop = 'var(--s-4)';
   const cols = [
-    { key: 'pending', label: 'Pendiente', dotColor: 'var(--text-faint)' },
+    { key: 'pending',  label: 'Pendiente',  dotColor: 'var(--text-faint)' },
     { key: 'progress', label: 'En progreso', dotColor: 'var(--amber)' },
-    { key: 'done', label: 'Hecho', dotColor: 'var(--green)' }
+    { key: 'done',     label: 'Hecho',       dotColor: 'var(--green)' }
   ];
+  const statusOrder = ['pending','progress','done'];
+  const statusLabels = { pending:'Pendiente', progress:'En progreso', done:'Hecho' };
+
   cols.forEach(c => {
     const col = document.createElement('div');
     col.className = 'kanban-col';
-    const colTasks = g.tasks.filter(t => t.status === c.key);
+    const colTasks = (g.tasks||[]).filter(t => t.status === c.key);
     col.innerHTML = `<h3><span class="pdot" style="background:${c.dotColor}"></span> ${c.label} <span class="kcount">${colTasks.length}</span></h3>`;
     colTasks.forEach(t => {
+      const asgn = (g.members||[]).find(m => m.user_id === t.assignee);
+      const addedByM = (g.members||[]).find(m => m.user_id === t.addedBy);
       const card = document.createElement('div');
       card.className = 'kanban-card';
-      const assignee = g.members.find(m => m.id === t.assignee);
-      const addedBy = g.members.find(m => m.id === t.addedBy);
-      const statusLabels = { pending: 'Pendiente', progress: 'En progreso', done: 'Hecho' };
-      const statusOrder = ['pending', 'progress', 'done'];
       card.innerHTML = `
-        <button class="kc-status kc-status-${t.status}" data-cycle="${t.id}" title="Click para cambiar estado">
+        <button class="kc-status kc-status-${t.status}" data-cycle="${t.id}" title="Cambiar estado">
           <span class="pdot" style="background:${c.dotColor}"></span> ${statusLabels[t.status]}
         </button>
         <div class="kc-title">${escapeHtml(t.title)}</div>
         <div class="kc-foot">
-          <span class="added-by">añadió ${escapeHtml(addedBy?.name || '—')}</span>
-          ${assignee ? `<span class="assignee"><span class="member${assignee.online?' member-online':''}">${escapeHtml(assignee.initials)}</span> ${escapeHtml(assignee.name)}</span>` : ''}
-        </div>
-      `;
-      card.addEventListener('click', e => {
-        if (e.target.closest('[data-cycle]')) return; // status button handled separately
-        openGroupTaskModal(g, t);
-      });
-      card.querySelector('[data-cycle]').addEventListener('click', e => {
+          <span class="added-by">añadió ${escapeHtml(addedByM ? memberLabel(addedByM).label : '—')}</span>
+          ${asgn ? `<span class="assignee"><span class="member">${escapeHtml(memberLabel(asgn).initials)}</span> ${escapeHtml(memberLabel(asgn).label)}</span>` : ''}
+        </div>`;
+      card.addEventListener('click', e => { if (!e.target.closest('[data-cycle]')) openGroupTaskModal(g, t); });
+      card.querySelector('[data-cycle]').addEventListener('click', async e => {
         e.stopPropagation();
-        const idx = statusOrder.indexOf(t.status);
-        t.status = statusOrder[(idx + 1) % statusOrder.length];
-        save(); renderGroups(); updateBadges();
+        t.status = statusOrder[(statusOrder.indexOf(t.status)+1) % statusOrder.length];
+        renderGroups(); updateBadges();
+        await pushGroupTasks(g.id, g.tasks);
       });
       col.appendChild(card);
     });
@@ -4290,11 +4389,13 @@ function renderGroups() {
 }
 
 function openGroupTaskModal(group, task) {
-  const memberOpts = group.members.map(m => `<option value="${m.id}" ${task.assignee===m.id?'selected':''}>${escapeHtml(m.name)}</option>`).join('');
+  const opts = (group.members||[]).map(m =>
+    `<option value="${m.user_id}" ${task.assignee===m.user_id?'selected':''}>${escapeHtml(memberLabel(m).label)}</option>`
+  ).join('');
   openModal({
     title: 'Editar tarea',
     body: `
-      <div style="display: flex; flex-direction: column; gap: var(--s-3);">
+      <div style="display:flex;flex-direction:column;gap:var(--s-3);">
         <div><label class="label-sm">Título</label><input class="input" id="m-gt" value="${escapeHtml(task.title)}" /></div>
         <div><label class="label-sm">Estado</label>
           <select class="select" id="m-gs">
@@ -4302,26 +4403,27 @@ function openGroupTaskModal(group, task) {
             <option value="progress" ${task.status==='progress'?'selected':''}>En progreso</option>
             <option value="done" ${task.status==='done'?'selected':''}>Hecho</option>
           </select></div>
-        <div><label class="label-sm">Asignado a</label>
-          <select class="select" id="m-ga">${memberOpts}</select></div>
-      </div>
-    `,
+        <div><label class="label-sm">Asignado a</label><select class="select" id="m-ga">${opts}</select></div>
+      </div>`,
     actions: [
-      { label: 'Eliminar', class: 'btn btn-danger', onClick: () => {
-        group.tasks = group.tasks.filter(t => t.id !== task.id);
-        save(); closeModal(); renderGroups(); updateBadges();
+      { label: 'Eliminar', class: 'btn btn-danger', onClick: async () => {
+        group.tasks = (group.tasks||[]).filter(t => t.id !== task.id);
+        closeModal(); renderGroups(); updateBadges();
+        await pushGroupTasks(group.id, group.tasks);
       }},
-      { label: 'Guardar', class: 'btn btn-primary', onClick: () => {
+      { label: 'Guardar', class: 'btn btn-primary', onClick: async () => {
         task.title = $('#m-gt').value.trim() || task.title;
         task.status = $('#m-gs').value;
         task.assignee = $('#m-ga').value;
-        save(); closeModal(); renderGroups(); updateBadges();
+        closeModal(); renderGroups(); updateBadges();
+        await pushGroupTasks(group.id, group.tasks);
       }}
     ]
   });
 }
 
 $('#group-create-first').addEventListener('click', createGroup);
+$('#group-join-first').addEventListener('click', showJoinGroupModal);
 
 /* =========================================================
    RECORDATORIOS Y APUNTES
