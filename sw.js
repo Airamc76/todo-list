@@ -1,4 +1,4 @@
-const CACHE = 'todolist-v5';
+const CACHE = 'easytotask-v1';
 const SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {

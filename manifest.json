@@ -1,7 +1,7 @@
 {
-  "name": "todolist-builtbyac",
-  "short_name": "Tareas",
-  "description": "Tu lista de tareas, siempre contigo",
+  "name": "easy to-task",
+  "short_name": "et",
+  "description": "Simple, minimal task management. Just get it done.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#faf7f2",
