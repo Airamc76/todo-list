@@ -2951,7 +2951,7 @@ try { supa = supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e) { console.war
 const isElectron = () => !!window.electronAPI;
 const DATA_URL   = () => isElectron()
   ? `${SUPA_URL}/rest/v1/app_data`
-  : `/api/supabase/rest/v1/app_data`;
+  : `https://ykhzmxgorxntuquinkjo.supabase.co/rest/v1/app_data`;
 
 let currentUser    = null;  // asignado DESPUÉS del pull → bloquea push prematuro
 let _authUser      = null;  // asignado al instante → UI
