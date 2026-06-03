@@ -3065,11 +3065,11 @@ function scheduleSync() {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
     try {
-      await dbFetch('POST', null, {
-        user_id:    currentUser.id,
-        data:       state,
-        updated_at: new Date().toISOString()
-      });
+      const { error } = await supa.from('app_data').upsert(
+        { user_id: currentUser.id, data: state, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      );
+      if (error) throw error;
       _syncTimer = null;
       setSyncStatus('', 'Guardado ✓');
     } catch(e) {
@@ -3084,13 +3084,17 @@ function scheduleSync() {
 async function pullFromCloud(user) {
   const uid = (user || currentUser)?.id;
   if (!uid) return false;
-  if (_syncTimer) return false;   // hay push pendiente → saltarse el pull para no pisar cambios locales
+  if (_syncTimer) return false;   // push pendiente → esperar para no pisar cambios locales
   setSyncStatus('syncing', 'Sincronizando…');
   try {
-    const rows = await dbFetch('GET', uid);
-    const row  = Array.isArray(rows) ? rows[0] : null;
+    const { data: rows, error } = await supa.from('app_data')
+      .select('data')
+      .eq('user_id', uid)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const row = rows?.[0];
     if (!row?.data) {
-      // Primera vez / cuenta nueva → subir datos locales
       setSyncStatus('', 'Nube vacía — subiendo datos locales…');
       return true;
     }
@@ -3247,6 +3251,7 @@ if (supa) {
     if (session?.user) {
       _authUser = session.user;
       showApp(session.user);
+      clearTimeout(_syncTimer); _syncTimer = null;  // garantiza que el pull inicial no sea bloqueado
       await pullFromCloud(session.user);  // pull primero, sin currentUser
       currentUser = session.user;         // push habilitado
     } else {
