@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tareas — Identidad de marca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');
+
+  :root {
+    --accent: #D85A30;
+    --accent-deep: #b8472d;
+    --accent-light: #f7a574;
+    --ink: #1f1b16;
+    --ink-soft: #6e6557;
+    --ink-faint: #a59c8c;
+    --paper: #faf7f2;
+    --surface: #ffffff;
+    --border: #ece6db;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    padding: 56px 32px 80px;
+  }
+
+  .page { max-width: 1080px; margin: 0 auto; }
+
+  .doc-head { margin-bottom: 56px; }
+  .doc-eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .doc-head h1 {
+    font-size: 40px; font-weight: 800; letter-spacing: -.03em;
+    margin-bottom: 8px;
+  }
+  .doc-head p { color: var(--ink-soft); font-size: 15px; max-width: 540px; }
+
+  .section { margin-bottom: 64px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint);
+    padding-bottom: 12px; margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ===== HERO logo lockup ===== */
+  .hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    margin-bottom: 16px;
+  }
+  .lockup { display: flex; align-items: center; gap: 24px; }
+  .wordmark {
+    font-size: 64px; font-weight: 800; letter-spacing: -.04em;
+    color: var(--ink);
+  }
+  .wordmark .accent-dot { color: var(--accent); }
+
+  /* mark — the check-loop glyph */
+  .mark {
+    flex: none;
+    display: block;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .swatch-card {
+    border-radius: 18px;
+    padding: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    border: 1px solid transparent;
+  }
+  .swatch-card.on-light { background: var(--surface); border-color: var(--border); }
+  .swatch-card.on-accent { background: var(--accent); }
+  .swatch-card.on-dark { background: #1f1b16; }
+  .swatch-card.on-cream { background: #f0e6d2; }
+  .card-cap {
+    font-size: 11px; color: var(--ink-faint);
+    margin-top: 10px; font-weight: 600;
+    letter-spacing: .04em;
+  }
+  .with-cap { display: flex; flex-direction: column; align-items: center; }
+
+  /* ===== icon grid ===== */
+  .icon-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 40px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 48px;
+  }
+  .icon-spec { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .icon-spec .size-label { font-size: 11px; color: var(--ink-faint); font-weight: 600; }
+  .app-tile {
+    border-radius: 22%;
+    background: var(--accent);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 24px -8px rgba(216,90,48,.5);
+  }
+  .app-tile.cream { background: #f0e6d2; box-shadow: 0 8px 24px -8px rgba(31,27,22,.2); }
+  .app-tile.dark { background: #1f1b16; box-shadow: 0 8px 24px -8px rgba(31,27,22,.4); }
+
+  /* ===== palette ===== */
+  .palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .color { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .color .chip { height: 96px; }
+  .color .meta { padding: 12px 14px; background: var(--surface); }
+  .color .name { font-size: 12.5px; font-weight: 600; }
+  .color .hex { font-size: 11.5px; color: var(--ink-faint); font-family: ui-monospace, monospace; margin-top: 2px; }
+
+  /* ===== construction / clearspace ===== */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 40px;
+  }
+  .panel h3 { font-size: 15px; margin-bottom: 6px; }
+  .panel p { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; }
+  .panel-center { display: flex; align-items: center; justify-content: center; min-height: 220px; }
+
+  /* ===== misuse ===== */
+  .dont-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .dont {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    text-align: center;
+  }
+  .dont-vis { height: 90px; display: grid; place-items: center; }
+  .dont-cap { font-size: 12px; color: var(--ink-soft); }
+  .dont-cap .x { color: #dc2626; font-weight: 700; }
+
+  /* type spec */
+  .type-spec { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 40px; }
+  .type-row { display: flex; align-items: baseline; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .type-row:last-child { border-bottom: 0; }
+  .type-meta { width: 140px; flex: none; font-size: 12px; color: var(--ink-faint); }
+  .type-meta strong { display: block; color: var(--ink); font-size: 13px; }
+
+  .app-context {
+    background: linear-gradient(135deg, #2a2722, #1f1b16);
+    border-radius: 24px;
+    padding: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 760px) {
+    body { padding: 32px 18px 60px; }
+    .hero { padding: 48px 24px; }
+    .wordmark { font-size: 44px; }
+    .hero-grid, .two-col { grid-template-columns: 1fr; }
+    .palette { grid-template-columns: repeat(2, 1fr); }
+    .dont-grid { grid-template-columns: 1fr; }
+    .doc-head h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== SVG symbol defs: reusable mark ===== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- The mark: a rounded square "card" with a bold checkmark that
+           continues into an upward stroke — suggesting a task done + momentum.
+           Drawn on a 100x100 grid. -->
+      <symbol id="tareas-mark" viewBox="0 0 100 100">
+        <rect x="6" y="6" width="88" height="88" rx="26" fill="currentColor"/>
+        <path d="M30 52 L44 66 L72 33"
+              fill="none" stroke="#fff" stroke-width="9"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <!-- monochrome / outline variant of just the glyph (no card) -->
+      <symbol id="tareas-glyph" viewBox="0 0 100 100">
+        <path d="M22 54 L42 74 L80 28"
+              fill="none" stroke="currentColor" stroke-width="11"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <header class="doc-head">
+    <div class="doc-eyebrow">Identidad de marca</div>
+    <h1>Tareas</h1>
+    <p>Una marca cálida y honesta para una app de tareas que no estorba. El símbolo: una tarjeta con un check que sube — terminar algo, y seguir avanzando.</p>
+  </header>
+
+  <!-- ===== PRIMARY LOCKUP ===== -->
+  <section class="section">
+    <div class="section-label">Logo principal</div>
+    <div class="hero">
+      <div class="lockup">
+        <svg class="mark" width="96" height="96" style="color: var(--accent)"><use href="#tareas-mark"/></svg>
+        <div class="wordmark">Tareas<span class="accent-dot">.</span></div>
+      </div>
+    </div>
+
+    <div class="hero-grid">
+      <div class="swatch-card on-light">
+        <div class="with-cap">
+          <div class="lockup">
+            <svg class="mark" width="52" height="52" style="color: var(--accent)"><use href="#tareas-mark"/></svg>
+            <div class="wordmark" style="font-size: 40px">Tareas<span class="accent-dot">.</span></div>
+          </div>
+          <div class="card-cap">Sobre claro · color</div>
+        </div>
+      </div>
+      <div class="swatch-card on-accent">
+        <div class="with-cap">
+          <div class="lockup">
+            <svg class="mark" width="52" height="52" style="color: #fff"><use href="#tareas-glyph"/></svg>
+            <div class="wordmark" style="font-size: 40px; color: #fff">Tareas<span style="color: #fff">.</span></div>
+          </div>
+          <div class="card-cap" style="color: rgba(255,255,255,.7)">Sobre acento · blanco</div>
+        </div>
+      </div>
+      <div class="swatch-card on-dark">
+        <div class="with-cap">
+          <div class="lockup">
+            <svg class="mark" width="52" height="52" style="color: var(--accent-light)"><use href="#tareas-mark"/></svg>
+            <div class="wordmark" style="font-size: 40px; color: #faf7f2">Tareas<span style="color: var(--accent-light)">.</span></div>
+          </div>
+          <div class="card-cap" style="color: rgba(255,255,255,.5)">Sobre oscuro</div>
+        </div>
+      </div>
+      <div class="swatch-card on-cream">
+        <div class="with-cap">
+          <div class="lockup">
+            <svg class="mark" width="52" height="52" style="color: var(--ink)"><use href="#tareas-glyph"/></svg>
+            <div class="wordmark" style="font-size: 40px; color: var(--ink)">Tareas<span style="color: var(--ink)">.</span></div>
+          </div>
+          <div class="card-cap">Monocromo · 1 tinta</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== APP ICON ===== -->
+  <section class="section">
+    <div class="section-label">Ícono de app</div>
+    <div class="icon-row">
+      <div class="icon-spec">
+        <div class="app-tile" style="width: 120px; height: 120px;">
+          <svg width="74" height="74" style="color:#fff"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div class="size-label">120 px</div>
+      </div>
+      <div class="icon-spec">
+        <div class="app-tile" style="width: 76px; height: 76px;">
+          <svg width="46" height="46" style="color:#fff"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div class="size-label">76 px</div>
+      </div>
+      <div class="icon-spec">
+        <div class="app-tile" style="width: 48px; height: 48px;">
+          <svg width="30" height="30" style="color:#fff"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div class="size-label">48 px</div>
+      </div>
+      <div class="icon-spec">
+        <div class="app-tile cream" style="width: 76px; height: 76px;">
+          <svg width="46" height="46" style="color:var(--accent)"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div class="size-label">Crema</div>
+      </div>
+      <div class="icon-spec">
+        <div class="app-tile dark" style="width: 76px; height: 76px;">
+          <svg width="46" height="46" style="color:var(--accent-light)"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div class="size-label">Oscuro</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CONSTRUCTION + CLEARSPACE ===== -->
+  <section class="section">
+    <div class="section-label">Construcción y aire</div>
+    <div class="two-col">
+      <div class="panel">
+        <h3>Geometría</h3>
+        <p>El símbolo nace de una retícula. La tarjeta usa radio 26/100 (~26%). El check arranca a ½ de altura y sube en diagonal de 45°.</p>
+        <div class="panel-center">
+          <svg width="200" height="200" viewBox="0 0 100 100">
+            <defs>
+              <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                <path d="M10 0 L0 0 0 10" fill="none" stroke="#ece6db" stroke-width="0.5"/>
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="100" height="100" fill="url(#grid)"/>
+            <rect x="6" y="6" width="88" height="88" rx="26" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity=".5"/>
+            <rect x="6" y="6" width="88" height="88" rx="26" fill="var(--accent)" opacity=".08"/>
+            <path d="M30 52 L44 66 L72 33" fill="none" stroke="var(--accent)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="30" cy="52" r="2" fill="var(--accent-deep)"/>
+            <circle cx="44" cy="66" r="2" fill="var(--accent-deep)"/>
+            <circle cx="72" cy="33" r="2" fill="var(--accent-deep)"/>
+          </svg>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Espacio de protección</h3>
+        <p>Deja un margen mínimo igual a la mitad de la altura del símbolo (½×) en todos los lados. Nunca lo invadas con otros elementos.</p>
+        <div class="panel-center">
+          <div style="position: relative; padding: 44px; border: 1.5px dashed var(--border); border-radius: 12px;">
+            <div style="position:absolute; inset: 44px; border: 1px solid transparent;"></div>
+            <svg class="mark" width="88" height="88" style="color: var(--accent); display:block;"><use href="#tareas-mark"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PALETTE ===== -->
+  <section class="section">
+    <div class="section-label">Paleta</div>
+    <div class="palette">
+      <div class="color"><div class="chip" style="background:#D85A30"></div><div class="meta"><div class="name">Terracota</div><div class="hex">#D85A30</div></div></div>
+      <div class="color"><div class="chip" style="background:#b8472d"></div><div class="meta"><div class="name">Terracota oscuro</div><div class="hex">#B8472D</div></div></div>
+      <div class="color"><div class="chip" style="background:#f7a574"></div><div class="meta"><div class="name">Terracota claro</div><div class="hex">#F7A574</div></div></div>
+      <div class="color"><div class="chip" style="background:#1f1b16"></div><div class="meta"><div class="name">Tinta</div><div class="hex">#1F1B16</div></div></div>
+      <div class="color"><div class="chip" style="background:#faf7f2; box-shadow: inset 0 0 0 1px #ece6db"></div><div class="meta"><div class="name">Papel</div><div class="hex">#FAF7F2</div></div></div>
+    </div>
+  </section>
+
+  <!-- ===== TYPOGRAPHY ===== -->
+  <section class="section">
+    <div class="section-label">Tipografía</div>
+    <div class="type-spec">
+      <div class="type-row">
+        <div class="type-meta"><strong>DM Sans</strong>800 · Extrabold</div>
+        <div style="font-weight: 800; font-size: 34px; letter-spacing: -.03em;">Tareas.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><strong>DM Sans</strong>700 · Bold</div>
+        <div style="font-weight: 700; font-size: 24px; letter-spacing: -.01em;">Organiza tu día sin esfuerzo</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><strong>DM Sans</strong>400 · Regular</div>
+        <div style="font-weight: 400; font-size: 16px; color: var(--ink-soft);">La app de tareas que se quita de en medio para que hagas lo que importa.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MISUSE ===== -->
+  <section class="section">
+    <div class="section-label">Usos incorrectos</div>
+    <div class="dont-grid">
+      <div class="dont">
+        <div class="dont-vis">
+          <svg class="mark" width="60" height="60" style="color: #6d28d9"><use href="#tareas-mark"/></svg>
+        </div>
+        <div class="dont-cap"><span class="x">✕</span> No cambies el color del símbolo</div>
+      </div>
+      <div class="dont">
+        <div class="dont-vis">
+          <svg class="mark" width="80" height="44" style="color: var(--accent); transform: scaleX(1.7)"><use href="#tareas-mark"/></svg>
+        </div>
+        <div class="dont-cap"><span class="x">✕</span> No lo estires ni deformes</div>
+      </div>
+      <div class="dont">
+        <div class="dont-vis">
+          <div style="display:flex; align-items:center; gap: 6px;">
+            <svg class="mark" width="44" height="44" style="color: var(--accent)"><use href="#tareas-mark"/></svg>
+            <span style="font-family: Georgia, serif; font-style: italic; font-size: 26px;">Tareas</span>
+          </div>
+        </div>
+        <div class="dont-cap"><span class="x">✕</span> No cambies la tipografía</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== IN CONTEXT ===== -->
+  <section class="section">
+    <div class="section-label">En contexto</div>
+    <div class="app-context">
+      <!-- phone mock -->
+      <div style="width: 200px; height: 420px; background: #faf7f2; border-radius: 32px; border: 8px solid #2a2722; box-shadow: 0 30px 60px -20px rgba(0,0,0,.5); overflow: hidden; position: relative;">
+        <div style="height: 120px; background: var(--accent); display: flex; align-items: center; justify-content: center;">
+          <svg width="56" height="56" style="color:#fff"><use href="#tareas-glyph"/></svg>
+        </div>
+        <div style="padding: 20px 18px;">
+          <div style="font-weight: 800; font-size: 22px; letter-spacing: -.03em; margin-bottom: 4px;">Tareas<span style="color:var(--accent)">.</span></div>
+          <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 20px;">Buenas tardes 👋</div>
+          <div style="display:flex; flex-direction: column; gap: 10px;">
+            <div style="display:flex; align-items:center; gap:10px; font-size: 13px;"><span style="width:16px;height:16px;border-radius:50%;background:var(--accent);flex:none;"></span> Comprar café</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size: 13px; color: var(--ink-faint); text-decoration: line-through;"><span style="width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);flex:none;"></span> Llamar al banco</div>
+            <div style="display:flex; align-items:center; gap:10px; font-size: 13px;"><span style="width:16px;height:16px;border-radius:50%;border:1.5px solid var(--ink-soft);flex:none;"></span> Terminar el diseño</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- business card-ish -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="width: 300px; height: 180px; background: var(--accent); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 20px 40px -16px rgba(216,90,48,.6);">
+          <svg width="44" height="44" style="color:#fff"><use href="#tareas-glyph"/></svg>
+          <div>
+            <div style="font-weight: 800; font-size: 26px; color: #fff; letter-spacing: -.03em;">Tareas<span style="color: rgba(255,255,255,.7)">.</span></div>
+            <div style="font-size: 12px; color: rgba(255,255,255,.8); margin-top: 2px;">tu día, organizado</div>
+          </div>
+        </div>
+        <div style="width: 300px; height: 180px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; justify-content: space-between;">
+          <svg class="mark" width="44" height="44" style="color: var(--accent)"><use href="#tareas-mark"/></svg>
+          <div>
+            <div style="font-weight: 800; font-size: 26px; color: var(--ink); letter-spacing: -.03em;">Tareas<span style="color: var(--accent)">.</span></div>
+            <div style="font-size: 12px; color: var(--ink-soft); margin-top: 2px;">descárgala gratis</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
