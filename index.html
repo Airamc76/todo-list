@@ -2386,24 +2386,6 @@
     text-decoration: underline; text-underline-offset: 2px;
   }
 
-  /* Toast de sync (visible en móvil) */
-  #sync-toast {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 12px);
-    left: 50%; transform: translateX(-50%);
-    background: var(--text);
-    color: var(--bg);
-    font-size: 12px; font-weight: 600;
-    padding: 8px 16px;
-    border-radius: 999px;
-    z-index: 9997;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity .25s;
-    white-space: nowrap;
-  }
-  #sync-toast.show { opacity: 1; }
-
   /* Sync indicator in sidebar */
   .sync-status {
     display: flex; align-items: center; gap: 6px;
@@ -2431,9 +2413,6 @@
 </style>
 </head>
 <body data-theme="light">
-
-  <!-- Toast sync -->
-  <div id="sync-toast"></div>
 
   <!-- ====== AUTH SCREEN ====== -->
   <div id="auth-screen">
@@ -2957,7 +2936,7 @@ let _accessToken   = null;  // JWT del usuario activo → para llamadas REST
 let _syncTimer     = null;
 
 // ── Sync status UI + toast móvil ──────────────────────────────
-let _toastTimer;
+
 function setSyncStatus(status, text) {
   // Sidebar status (desktop/tablet)
   const el = document.getElementById('sync-status');
@@ -2965,24 +2944,6 @@ function setSyncStatus(status, text) {
   if (el && lb) {
     el.className = 'sync-status' + (status ? ' ' + status : '');
     lb.textContent = text;
-  }
-  // Toast (móvil — siempre visible)
-  const toast = document.getElementById('sync-toast');
-  if (!toast) return;
-  if (status === 'syncing') {
-    toast.textContent = '⟳ ' + text;
-    toast.classList.add('show');
-    clearTimeout(_toastTimer);
-  } else if (status === 'error') {
-    toast.textContent = '✗ ' + text;
-    toast.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
-  } else {
-    toast.textContent = '✓ ' + text;
-    toast.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
   }
 }
 
