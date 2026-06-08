@@ -1,0 +1,22 @@
+[build]
+  publish = "project"
+
+# Proxy Supabase REST API (evita CORS y bloqueos en iOS Safari)
+[[redirects]]
+  from = "/api/supabase/*"
+  to = "https://ykhzmxgorxntuquinkjo.supabase.co/:splat"
+  status = 200
+  force = true
+
+# NO redirigir .well-known (necesario para Android assetlinks)
+[[redirects]]
+  from = "/.well-known/*"
+  to = "/.well-known/:splat"
+  status = 200
+  force = true
+
+# SPA fallback — todo lo demás a index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -3065,12 +3065,21 @@ async function pullFromCloud(user, force = false) {
       setSyncStatus('', 'Nube vacía — subiendo datos locales…');
       return true;
     }
-    // La nube manda — eliminaciones y cambios de cualquier dispositivo llegan aquí.
-    state = { ...defaultState(), ...row.data };
+    // Comparar nube vs estado actual para evitar re-render innecesario (quita el parpadeo)
+    const newState = { ...defaultState(), ...row.data };
+    const cloudHash = JSON.stringify(newState);
+    const localHash = JSON.stringify(state);
+    const dataChanged = cloudHash !== localHash;
+
+    state = newState;
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    try { renderAll(); }     catch(re) { console.error('renderAll:', re); }
-    try { applyTheme(); }    catch {}
-    try { applySettings(); } catch {}
+
+    if (dataChanged) {
+      // Solo re-renderizar si los datos realmente cambiaron
+      try { renderAll(); }     catch(re) { console.error('renderAll:', re); }
+      try { applyTheme(); }    catch {}
+      try { applySettings(); } catch {}
+    }
     setSyncStatus('', `Sincronizado ✓ · ${state.pendientes?.length ?? 0} pend.`);
     fetchGroupsFromCloud();   // grupos en tabla separada
     return true;
